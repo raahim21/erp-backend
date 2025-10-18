@@ -6,11 +6,20 @@ const productSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
-  quantity: {
-    type: Number,
-    required: true,
-    min: 0,
-  },
+  unit: { type: String, default: "pcs" },
+  manufacturer: String,
+  brand: String,
+  weight: Number,
+  returnable: { type: Boolean, default: false },
+
+  inventory: [
+    {
+      location: { type: mongoose.Schema.Types.ObjectId, ref: "Location" },
+      quantity: { type: Number, default: 0 },
+    },
+  ],
+  sellable: { type: Boolean, default: true },
+  purchasable: { type: Boolean, default: true },
   isDeleted: {
     type: Boolean,
     default: false,
@@ -20,7 +29,10 @@ const productSchema = new mongoose.Schema({
     required: true,
     min: 0,
   },
-
+  sku: {
+    type:String,
+    required:true,
+  },
   description: {
     type: String,
     required: false,
@@ -41,6 +53,7 @@ const productSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  isDeleted: { type: Boolean, default: false }
 });
 
 productSchema.index({ name: 1 }, { unique: true });

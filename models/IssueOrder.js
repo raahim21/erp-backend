@@ -6,6 +6,7 @@ const issueOrderSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
+  customerId: { type: mongoose.Schema.Types.ObjectId, ref: "Customer" },
   clientPhone: {
     type: String,
     trim: true,

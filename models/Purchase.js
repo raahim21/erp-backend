@@ -6,13 +6,15 @@ const purchaseSchema = new mongoose.Schema({
     enum: ["Vendor", "Internal", "Transfer"],
     required: true,
   },
-  supplier: {
-    type: String,
-    trim: true,
-    required: function(){
-    return this.type == 'Vendor'
-    },
+
+  vendorId: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Vendor",
+  required: function() {
+    return this.type === "Vendor";
   },
+},
+
   department: {
     type: String,
     required: function(){
@@ -21,21 +23,20 @@ const purchaseSchema = new mongoose.Schema({
     trim: true,
   },
 
-toLocation: {
-  type: String,
-  required: function() {
-    return this.type === "Transfer";
-  },
-  trim: true,
-},
 fromLocation: {
-  type: String,
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Location",
   required: function() {
     return this.type === "Transfer";
   },
-  trim: true,
 },
-
+toLocation: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Location",
+  required: function() {
+    return this.type === "Transfer";
+  },
+},
 
   productId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -80,7 +81,7 @@ fromLocation: {
 });
 
 purchaseSchema.index({ purchaseDate: 1 });
-purchaseSchema.index({ supplier: 1 });
+purchaseSchema.index({ vendorId: 1 });
 purchaseSchema.index({ status: 1 });
 
 module.exports = mongoose.model("Purchase", purchaseSchema);

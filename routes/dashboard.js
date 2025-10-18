@@ -1,4 +1,3 @@
-
 const express = require("express");
 const router = express.Router();
 
@@ -9,19 +8,27 @@ const IssueOrder = require("../models/IssueOrder");
 router.get("/stats", async (req, res) => {
   try {
     // --- Products ---
-    const totalProductsData = await Product.aggregate([
-      { $group: { _id: null, totalProducts: { $sum: 1 } } },
-    ]);
+    const totalProducts = await Product.countDocuments({ isDeleted: false });
+
     const totalStockData = await Product.aggregate([
-      { $group: { _id: null, totalStock: { $sum: "$quantity" } } },
+      { $match: { isDeleted: false } },
+      { $unwind: "$inventory" },
+      { $group: { _id: null, totalStock: { $sum: "$inventory.quantity" } } },
     ]);
+    const totalStock = totalStockData[0]?.totalStock || 0;
+
     const lowestStockProducts = await Product.aggregate([
-      { $sort: { quantity: 1 } },
-      { $project: { name: 1, quantity: 1 } },
+      { $match: { isDeleted: false } },
+      { $addFields: { totalQuantity: { $sum: "$inventory.quantity" } } },
+      { $sort: { totalQuantity: 1 } },
       { $limit: 3 },
+      { $project: { name: 1, quantity: "$totalQuantity" } },
     ]);
+
     const lowStockItems = await Product.aggregate([
-      { $match: { quantity: { $lte: 5 } } },
+      { $match: { isDeleted: false } },
+      { $addFields: { totalQuantity: { $sum: "$inventory.quantity" } } },
+      { $match: { totalQuantity: { $lte: 5 } } },
     ]);
 
     // --- Purchases ---
@@ -34,11 +41,17 @@ router.get("/stats", async (req, res) => {
         },
       },
     ]);
+
     const topSuppliers = await Purchase.aggregate([
-      { $group: { _id: "$supplier", totalSpent: { $sum: "$totalPrice" } } },
+      { $match: { type: "Vendor" } },
+      { $group: { _id: "$vendorId", totalSpent: { $sum: "$totalPrice" } } },
       { $sort: { totalSpent: -1 } },
       { $limit: 3 },
+      { $lookup: { from: "vendors", localField: "_id", foreignField: "_id", as: "vendor" } },
+      { $unwind: "$vendor" },
+      { $project: { _id: "$vendor.name", totalSpent: 1 } },
     ]);
+
     const purchasesByType = await Purchase.aggregate([
       { $group: { _id: "$type", count: { $sum: 1 }, totalSpent: { $sum: "$totalPrice" } } },
       { $sort: { count: -1 } },
@@ -58,22 +71,14 @@ router.get("/stats", async (req, res) => {
       },
     ]);
     const totalRevenueData = await IssueOrder.aggregate([
-      { $unwind: "$products" },
-      {
-        $group: {
-          _id: null,
-          totalRevenue: {
-            $sum: { $multiply: ["$products.quantity", "$products.unitPrice"] },
-          },
-        },
-      },
+      { $group: { _id: null, totalRevenue: { $sum: "$totalAmount" } } },
     ]);
 
     // --- Send all stats ---
     res.json({
       products: {
-        totalProducts: totalProductsData[0]?.totalProducts || 0,
-        totalStock: totalStockData[0]?.totalStock || 0,
+        totalProducts: totalProducts || 0,
+        totalStock: totalStock || 0,
         lowestStockProducts,
         lowStockItems,
       },
