@@ -69,5 +69,5 @@ mongoose
 // Routes
 
 
-// app.listen(process.env.PORT, () => console.log("Server running on port 5000"));
-app.listen(5000, () => console.log("Server running on port 5000"));
+app.listen(process.env.PORT, () => console.log("Server running on port 8000"));
+// app.listen(5000, () => console.log("Server running on port 5000"));
