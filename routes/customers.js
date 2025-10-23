@@ -16,48 +16,46 @@ router.post(
   requireRole("admin", "manager"),
   [
     body("name").isString().trim().notEmpty().withMessage("Customer name is required"),
-    body("phone").optional().isString().trim(),
-    body("email").optional().isEmail().normalizeEmail(),
-    body("address").optional().isString().trim(),
-    body("company").optional().isString().trim(),
-    body("taxNumber").optional().isString().trim(),
-    body("notes").optional().isString().trim(),
+    body("phone").optional({ checkFalsy: true }).isString().trim(),
+    body("email").optional({ checkFalsy: true }).isEmail().normalizeEmail(),
+    body("address").optional({ checkFalsy: true }).isString().trim(),
+    body("company").optional({ checkFalsy: true }).isString().trim(),
+    body("taxNumber").optional({ checkFalsy: true }).isString().trim(),
+    body("notes").optional({ checkFalsy: true }).isString().trim(),
   ],
   handleValidationErrors,
   async (req, res) => {
     try {
       const { name, phone, email, address, company, taxNumber, notes } = req.body;
 
+      const existingCustomer = await Customer.findOne({ name, isDeleted: false });
+      if(existingCustomer) {
+          return res.status(400).json({ message: "A customer with this name already exists."});
+      }
+
       const customer = new Customer({
-        name,
-        phone,
-        email,
-        address,
-        company,
-        taxNumber,
-        notes,
+        name, phone, email, address, company, taxNumber, notes,
         userId: req.user.id,
       });
 
       await customer.save();
-      await logAction(req.user.id, "Created customer");
+      await logAction(req.user.id, "Created customer", customer.name);
       res.status(201).json(customer);
     } catch (error) {
-      console.error("POST /customers: Error:", error.message);
       res.status(500).json({ message: error.message });
     }
   }
 );
 
-// Get All Customers (with pagination and search)
+// Get All Customers (active ones only)
 router.get("/", auth, async (req, res) => {
   try {
     const search = req.query.search || "";
     const page = parseInt(req.query.page) || 1;
     const limit = 10;
     const skip = (page - 1) * limit;
-    const filter = {};
-
+    
+    const filter = { isDeleted: false };
     if (search) {
       filter.$or = [
         { name: { $regex: search, $options: "i" } },
@@ -78,7 +76,6 @@ router.get("/", auth, async (req, res) => {
       currentPage: page,
     });
   } catch (error) {
-    console.error("GET /customers: Error:", error.message);
     res.status(500).json({ message: error.message });
   }
 });
@@ -87,12 +84,11 @@ router.get("/", auth, async (req, res) => {
 router.get("/:id", auth, async (req, res) => {
   try {
     const customer = await Customer.findById(req.params.id);
-    if (!customer) {
+    if (!customer || customer.isDeleted) {
       return res.status(404).json({ message: "Customer not found" });
     }
     res.json(customer);
   } catch (error) {
-    console.error("GET /customers/:id: Error:", error.message);
     res.status(500).json({ message: error.message });
   }
 });
@@ -103,43 +99,38 @@ router.put(
   auth,
   requireRole("admin", "manager"),
   [
-    body("name").optional().isString().trim().notEmpty().withMessage("Customer name is required"),
-    body("phone").optional().isString().trim(),
-    body("email").optional().isEmail().normalizeEmail(),
-    body("address").optional().isString().trim(),
-    body("company").optional().isString().trim(),
-    body("taxNumber").optional().isString().trim(),
-    body("notes").optional().isString().trim(),
+    body("name").optional().isString().trim().notEmpty().withMessage("Customer name must not be empty"),
+    body("phone").optional({ checkFalsy: true }).isString().trim(),
+    body("email").optional({ checkFalsy: true }).isEmail().normalizeEmail(),
+    body("address").optional({ checkFalsy: true }).isString().trim(),
+    body("company").optional({ checkFalsy: true }).isString().trim(),
+    body("taxNumber").optional({ checkFalsy: true }).isString().trim(),
+    body("notes").optional({ checkFalsy: true }).isString().trim(),
   ],
   handleValidationErrors,
   async (req, res) => {
     try {
-      const { name, phone, email, address, company, taxNumber, notes } = req.body;
-
       const customer = await Customer.findById(req.params.id);
-      if (!customer) {
+      if (!customer || customer.isDeleted) {
         return res.status(404).json({ message: "Customer not found" });
       }
 
-      customer.name = name || customer.name;
-      customer.phone = phone !== undefined ? phone : customer.phone;
-      customer.email = email !== undefined ? email : customer.email;
-      customer.address = address !== undefined ? address : customer.address;
-      customer.company = company !== undefined ? company : customer.company;
-      customer.taxNumber = taxNumber !== undefined ? taxNumber : customer.taxNumber;
-      customer.notes = notes !== undefined ? notes : customer.notes;
-
+      Object.keys(req.body).forEach(key => {
+        if(req.body[key] !== undefined) {
+          customer[key] = req.body[key];
+        }
+      });
+      
       await customer.save();
-      await logAction(req.user.id, "Updated customer");
+      await logAction(req.user.id, "Updated customer", customer.name);
       res.json(customer);
     } catch (error) {
-      console.error("PUT /customers/:id: Error:", error.message);
       res.status(500).json({ message: error.message });
     }
   }
 );
 
-// Delete Customer
+// Soft Delete Customer
 router.delete(
   "/:id",
   auth,
@@ -147,21 +138,21 @@ router.delete(
   async (req, res) => {
     try {
       const customer = await Customer.findById(req.params.id);
-      if (!customer) {
-        return res.status(404).json({ message: "Customer not found" });
+      if (!customer || customer.isDeleted) {
+        return res.status(404).json({ message: "Customer not found or already deleted" });
       }
 
-      // Check if customer is referenced in any issue orders
+      // Check if customer is referenced in any issue orders before archiving
       const issueOrderCount = await IssueOrder.countDocuments({ customerId: req.params.id });
       if (issueOrderCount > 0) {
-        return res.status(400).json({ message: "Cannot delete customer with associated issue orders" });
+        return res.status(400).json({ message: "Cannot archive customer with associated issue orders. Please resolve orders first." });
       }
 
-      await customer.deleteOne();
-      await logAction(req.user.id, "Deleted customer");
-      res.json({ message: "Customer deleted" });
+      customer.isDeleted = true;
+      await customer.save();
+      await logAction(req.user.id, "Soft Deleted customer", customer.name);
+      res.json({ message: "Customer archived successfully" });
     } catch (error) {
-      console.error("DELETE /customers/:id: Error:", error.message);
       res.status(500).json({ message: error.message });
     }
   }

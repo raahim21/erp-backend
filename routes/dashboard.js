@@ -167,7 +167,6 @@ router.get("/sales-report", async function (req, res) {
     sortObj["_id.month"] = 1;
   }
   pipeline.push({ $sort: sortObj });
-
   const result = await IssueOrder.aggregate(pipeline);
   return result;
 }

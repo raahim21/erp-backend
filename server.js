@@ -20,6 +20,7 @@ const stockAdjustmentRoutes = require('./routes/stockAdjustments.js')
 const notificationRoutes = require('./routes/notifications.js')
 const brandRoutes = require('./routes/brand.js')
 const dummy  = require('./routes/dummy.js')
+const leaveRoutes = require('./routes/leave.js')
 
 const app = express();
 
@@ -54,7 +55,8 @@ app.use('/api/notifications', notificationRoutes)
 app.use('/api/stockAdjustments', stockAdjustmentRoutes)
 app.use('/api/brands', brandRoutes)
 app.use("/api/vendors", vendorRoutes);
-app.use("/api/dummy", dummy);
+app.use("/api/leave", leaveRoutes);
+
 
 // MongoDB connection
 mongoose
@@ -67,4 +69,5 @@ mongoose
 // Routes
 
 
-app.listen(process.env.PORT, () => console.log("Server running on port 8000"));
+// app.listen(process.env.PORT, () => console.log("Server running on port 5000"));
+app.listen(5000, () => console.log("Server running on port 5000"));

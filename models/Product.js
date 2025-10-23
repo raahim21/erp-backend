@@ -8,7 +8,7 @@ const productSchema = new mongoose.Schema({
   },
   unit: { type: String, default: "pcs" },
   manufacturer: String,
-  brand: String,
+  brand: {type: mongoose.Schema.Types.ObjectId, ref: "Brand"},
   weight: Number,
   returnable: { type: Boolean, default: false },
 

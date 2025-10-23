@@ -4,11 +4,42 @@
 // const logAction = require("../utils/logAction");
 // let auth = require("../middleware/auth");
 // const requireRole = require("../middleware/roles");
-// const bcrypt = require("bcrypt");
 // const router = express.Router();
 // const dateFilter = require("../utils/dateFilter");
 
 // // Register
+// router.post(
+//   "/users",
+//   auth,
+//   requireRole("admin", "manager"),
+//   async (req, res) => {
+//     try {
+//       const { username, password, role, jobPosition, hourlyRate, maxHoursPerWeek, availability } = req.body;
+//       if (!username || !password) {
+//         return res.status(400).json({ message: "Username and password are required" });
+//       }
+//       const existingUser = await User.findOne({ username });
+//       if (existingUser) {
+//         return res.status(400).json({ message: "Username already exists" });
+//       }
+//       const user = new User({
+//         username,
+//         password,
+//         role: role || "staff",
+//         jobPosition,
+//         hourlyRate,
+//         maxHoursPerWeek,
+//         availability,
+//       });
+//       await user.save();
+//       await logAction(req.user.id, "Registered New User");
+//       res.status(201).json({ message: "User created successfully" });
+//     } catch (error) {
+//       console.error("Error creating user:", error);
+//       res.status(500).json({ message: "Server error" });
+//     }
+//   }
+// );
 
 // router.delete(
 //   "/users/:id",
@@ -17,9 +48,7 @@
 //   async (req, res) => {
 //     try {
 //       const { id } = req.params;
-
 //       let user = await User.findByIdAndDelete(id);
-
 //       if (!user) {
 //         return res.status(404).json({ message: "User not found" });
 //       }
@@ -36,7 +65,7 @@
 //   try {
 //     const { username, startDate, endDate } = req.query;
 //     let page = parseInt(req.query.page) || 1;
-//     let limit = parseInt(req.query.limit) || 5; // Default limit
+//     let limit = parseInt(req.query.limit) || 5;
 //     let skip = (page - 1) * limit;
 //     let query = {};
 //     if (username) {
@@ -48,19 +77,19 @@
 //       startDate ? new Date(startDate) : null,
 //       endDate ? new Date(endDate) : null
 //     );
-//     console.log(query);
+
 //     const users = await User.find(query)
-//       .select("username _id jobPosition")
+//       .select("username _id jobPosition role createdAt")
 //       .skip(skip)
-//       .limit(limit) // Limit to prevent overwhelming the response
+//       .limit(limit)
 //       .lean();
 
 //     const totalResults = await User.countDocuments(query);
 //     const totalPages = Math.ceil(totalResults / limit);
 //     res.json({
 //       users,
-//       totalPages: totalPages,
-//       totalResults: users.length,
+//       totalPages,
+//       totalResults: totalResults,
 //       currentPage: page,
 //     });
 //   } catch (err) {
@@ -72,18 +101,12 @@
 // router.get(
 //   "/users/:id",
 //   auth,
-
 //   requireRole("admin", "manager"),
 //   async (req, res) => {
 //     try {
-//       let filter = {};
-//       if (req.query.username) {
-//         filter.username = { $regex: req.query.username, $options: "i" }; // case-insensitive
-//       } else {
-//         filter._id = req.query.id;
-//       }
-//       let users = await User.findOne({ _id: req.params.id });
-//       res.json(users);
+//       const user = await User.findById(req.params.id).select("-password");
+//       if (!user) return res.status(404).json({ message: "User not found" });
+//       res.json(user);
 //     } catch (error) {
 //       console.log(error);
 //       res.status(500).json({ message: "Server error" });
@@ -91,30 +114,23 @@
 //   }
 // );
 
-// router.put("/users/:id", async (req, res) => {
+// router.put("/users/:id", auth, requireRole("admin", "manager"), async (req, res) => {
 //   try {
-//     let { password } = req.body;
+//     const { password, username, role, jobPosition, hourlyRate, maxHoursPerWeek, availability } = req.body;
 //     const { id } = req.params;
 //     let user = await User.findById(id);
 //     if (!user) return res.status(404).json({ message: "User not found" });
 
-//     // Update password if provided
-//     if (password) {
-//       user.password = password;
-//     }
+//     if (password) user.password = password;
+//     if (username) user.username = username;
+//     if (role) user.role = role;
+//     if (jobPosition) user.jobPosition = jobPosition;
+//     if (hourlyRate) user.hourlyRate = hourlyRate;
+//     if (maxHoursPerWeek) user.maxHoursPerWeek = maxHoursPerWeek;
+//     if (availability) user.availability = availability;
 
-//     // Update other fields if provided
-//     // Add fields like username, role, jobPosition, etc., if needed
-//     if (req.body.username) user.username = req.body.username;
-//     if (req.body.role) user.role = req.body.role;
-//     if (req.body.jobPosition) user.jobPosition = req.body.jobPosition;
-//     if (req.body.hourlyRate) user.hourlyRate = req.body.hourlyRate;
-//     if (req.body.maxHoursPerWeek)
-//       user.maxHoursPerWeek = req.body.maxHoursPerWeek;
-//     if (req.body.availability) user.availability = req.body.availability;
-
-//     await user.save(); // Triggers pre("save") middleware to hash password if modified
-
+//     await user.save();
+//     await logAction(req.user.id, "Updated User", user.username);
 //     res.status(200).json({ message: "User updated successfully" });
 //   } catch (error) {
 //     console.error("Error updating user:", error);
@@ -122,43 +138,13 @@
 //   }
 // });
 
-// router.post(
-//   "/users",
-//   auth,
-//   requireRole("admin", "manager"),
-//   async (req, res) => {
-//     try {
-//       const { username, password } = req.body;
-//       if (!username || !password) {
-//         return res
-//           .status(400)
-//           .json({ message: "Username and password are required" });
-//       }
-//       const existingUser = await User.findOne({ username });
-
-//       if (existingUser) {
-//         return res.status(400).json({ message: "Username already exists" });
-//       }
-//       const user = new User({ ...req.body });
-//       await user.save();
-//       await logAction(req.user.id, "Registered New User");
-//       res.status(201).json({ message: "User created successfully" });
-//     } catch (error) {
-//       console.error("Error creating user:", error);
-//       res.status(500).json({ message: "Server error" });
-//     }
-//   }
-// );
-
 // // Login
 // router.post("/login", async (req, res) => {
 //   try {
 //     const { username, password } = req.body;
 //     if (!username || !password) {
 //       res.clearCookie("token");
-//       return res
-//         .status(400)
-//         .json({ message: "Username and password are required" });
+//       return res.status(400).json({ message: "Username and password are required" });
 //     }
 
 //     const user = await User.findOne({ username });
@@ -170,16 +156,14 @@
 //     const token = jwt.sign(
 //       { id: user._id, role: user.role },
 //       process.env.JWT_SECRET,
-//       {
-//         expiresIn: "1d",
-//       }
+//       { expiresIn: "1d" }
 //     );
 //     res.cookie("token", token, {
-//   httpOnly: true,
-//   secure: process.env.NODE_ENV === "production" ? true : false,
-//   sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-//   maxAge: 24 * 60 * 60 * 1000 * 3,
-// });
+//       httpOnly: true,
+//       secure: process.env.NODE_ENV === "production",
+//       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+//       maxAge: 24 * 60 * 60 * 1000 * 3,
+//     });
 //     await logAction(user._id, "Logged in");
 //     res.json({ userId: user._id });
 //   } catch (error) {
@@ -198,12 +182,12 @@
 //     }
 
 //     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-//     const user = await User.findById(decoded.id).select("_id role");
+//     const user = await User.findById(decoded.id).select("_id role username");
 //     if (!user) {
 //       res.clearCookie("token");
 //       return res.status(401).json({ message: "User not found" });
 //     }
-    
+
 //     res.json({ userId: user._id, role: user.role });
 //   } catch (error) {
 //     console.error("Verify error:", error);
@@ -230,19 +214,8 @@
 // });
 
 // module.exports = router;
-
-
-
-
-
-
-
-
-
-
-
 const express = require("express");
-const jwt = require("jsonwebtoken");
+const jwt =require("jsonwebtoken");
 const User = require("../models/User");
 const logAction = require("../utils/logAction");
 let auth = require("../middleware/auth");
@@ -337,6 +310,17 @@ router.get("/users-all", auth, async (req, res) => {
     });
   } catch (err) {
     console.error("Error fetching users:", err);
+    res.status(500).json({ msg: "Server error" });
+  }
+});
+
+// Get all users for selection dropdowns
+router.get("/users/list", auth, async (req, res) => {
+  try {
+    const users = await User.find({}).select("username _id jobPosition").lean();
+    res.json(users);
+  } catch (err) {
+    console.error("Error fetching users list:", err);
     res.status(500).json({ msg: "Server error" });
   }
 });

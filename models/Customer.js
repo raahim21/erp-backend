@@ -9,6 +9,7 @@ const customerSchema = new mongoose.Schema({
   taxNumber: { type: String, trim: true }, // Optional tax registration ID
   notes: { type: String, trim: true }, // Random extra info
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  isDeleted: { type: Boolean, required:true, default:false }
 });
 
 module.exports = mongoose.model("Customer", customerSchema);

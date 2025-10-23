@@ -1,4 +1,3 @@
-
 const express = require("express");
 const Category = require("../models/Category");
 const auth = require("../middleware/auth");
@@ -11,7 +10,14 @@ const router = express.Router();
 router.post("/", auth, requireRole("admin", "manager"), async (req, res) => {
   try {
     const { name, description } = req.body;
-    if (!name) return res.status(400).json({ message: "Name is required" });
+    if (!name || name.trim().length === 0) {
+      return res.status(400).json({ message: "Name is required" });
+    }
+
+    const existingCategory = await Category.findOne({ name: name.trim(), isDeleted: false });
+    if (existingCategory) {
+      return res.status(400).json({ message: "A category with this name already exists." });
+    }
 
     const category = new Category({ name, description });
     await category.save();
@@ -22,23 +28,29 @@ router.post("/", auth, requireRole("admin", "manager"), async (req, res) => {
   }
 });
 
-// Get All Categories
+// Get All Categories (active ones only)
 router.get("/", auth, async (req, res) => {
   try {
     const { search, page = 1, limit = 10 } = req.query;
-    const skip = (page - 1) * limit;
-    const filter = search ? { name: { $regex: search, $options: "i" } } : {};
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const filter = { isDeleted: false };
+    if (search) {
+      filter.name = { $regex: search, $options: "i" };
+    }
 
     const [categories, total] = await Promise.all([
-      Category.find(filter).skip(skip).limit(parseInt(limit)),
+      Category.find(filter).sort({ name: 1 }).skip(skip).limit(limitNum),
       Category.countDocuments(filter),
     ]);
 
     res.json({
       categories,
       totalResults: total,
-      totalPages: Math.ceil(total / limit),
-      currentPage: parseInt(page),
+      totalPages: Math.ceil(total / limitNum),
+      currentPage: pageNum,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -49,7 +61,9 @@ router.get("/", auth, async (req, res) => {
 router.get("/:id", auth, async (req, res) => {
   try {
     const category = await Category.findById(req.params.id);
-    if (!category) return res.status(404).json({ message: "Category not found" });
+    if (!category || category.isDeleted) {
+      return res.status(404).json({ message: "Category not found" });
+    }
     res.json(category);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -61,7 +75,9 @@ router.put("/:id", auth, requireRole("admin", "manager"), async (req, res) => {
   try {
     const { name, description } = req.body;
     const category = await Category.findById(req.params.id);
-    if (!category) return res.status(404).json({ message: "Category not found" });
+    if (!category || category.isDeleted) {
+      return res.status(404).json({ message: "Category not found" });
+    }
 
     if (name) category.name = name;
     if (description !== undefined) category.description = description;
@@ -74,32 +90,21 @@ router.put("/:id", auth, requireRole("admin", "manager"), async (req, res) => {
   }
 });
 
-// Delete Category
-router.delete("/:id", auth, requireRole("admin", "manager"), async (req, res) => {
-  try {
-    const category = await Category.findByIdAndDelete(req.params.id);
-    if (!category) return res.status(404).json({ message: "Category not found" });
-    await logAction(req.user.id, "Deleted Category", category.name);
-    res.json({ message: "Category deleted" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-
+// Soft Delete Category
 router.delete("/:id", auth, requireRole("admin", "manager"), async (req, res) => {
   try {
     const item = await Category.findById(req.params.id);
     if (!item || item.isDeleted) {
-      return res.status(404).json({ message: "Not found or already deleted" });
+      return res.status(404).json({ message: "Category not found or already deleted" });
     }
     item.isDeleted = true;
     await item.save();
     await logAction(req.user.id, "Soft Deleted Category", `${item.name}`);
-    res.json({ message: `${Category} archived` });
+    res.json({ message: "Category archived successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
 
 module.exports = router;
+

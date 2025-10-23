@@ -45,6 +45,11 @@ const issueOrderSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
+  isDeleted: {
+    type: Boolean,
+    required:false,
+    default:false,
+  }
 });
 
 module.exports = mongoose.model("IssueOrder", issueOrderSchema);
