@@ -187,41 +187,41 @@ router.post("/login", async (req, res) => {
 });
 
 // Verify Token
-// router.get("/verify", async (req, res) => {
-//   try {
-//     const token = req.cookies.token;
-//     if (!token) {
-//       return res.status(401).json({ message: "No token provided" });
-//     }
-
-//     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-//     const user = await User.findById(decoded.id).select("_id role username");
-//     if (!user) {
-//       res.clearCookie("token");
-//       return res.status(401).json({ message: "User not found" });
-//     }
-
-//     res.json({ userId: user._id, role: user.role });
-//   } catch (error) {
-//     console.error("Verify error:", error);
-//     res.clearCookie("token");
-//     res.status(401).json({ message: "Invalid token" });
-//   }
-// });
 router.get("/verify", async (req, res) => {
   try {
     const token = req.cookies.token;
-    if (!token) return res.status(401).json({ message: "No token provided" });
+    if (!token) {
+      return res.status(401).json({ message: "No token provided" });
+    }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id).select("_id role username");
-    if (!user) return res.status(401).json({ message: "User not found" });
+    if (!user) {
+      res.clearCookie("token");
+      return res.status(401).json({ message: "User not found" });
+    }
 
-    res.json({ id: user._id, role: user.role, username: user.username });
+    res.json({ userId: user._id, role: user.role });
   } catch (error) {
+    console.error("Verify error:", error);
+    res.clearCookie("token");
     res.status(401).json({ message: "Invalid token" });
   }
 });
+// router.get("/verify", async (req, res) => {
+//   try {
+//     const token = req.cookies.token;
+//     if (!token) return res.status(401).json({ message: "No token provided" });
+
+//     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+//     const user = await User.findById(decoded.id).select("_id role username");
+//     if (!user) return res.status(401).json({ message: "User not found" });
+
+//     res.json({ id: user._id, role: user.role, username: user.username });
+//   } catch (error) {
+//     res.status(401).json({ message: "Invalid token" });
+//   }
+// });
 
 
 // Logout
@@ -231,7 +231,7 @@ router.post("/logout", auth, async (req, res) => {
     await logAction(user.id, "User Logged out");
     res.clearCookie("token", {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: true,
       sameSite: "none",
     });
     res.json({ message: "Logged out successfully" });
