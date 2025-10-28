@@ -491,7 +491,7 @@ const auth = require("../middleware/auth");
 const requireRole = require("../middleware/roles");
 const { body } = require("express-validator");
 const handleValidationErrors = require("../middleware/validation");
-const purchasesController = require("../controllers/purchasesController");
+const purchasesController = require("../controllers/purchaseController");
 
 const router = express.Router();
 

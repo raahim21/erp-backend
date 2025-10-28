@@ -245,7 +245,7 @@
 const express = require("express");
 const auth = require("../middleware/auth");
 const requireRole = require("../middleware/roles");
-const productController = require("../controllers/products.controller");
+const productController = require("../controllers/productsController");
 
 const router = express.Router();
 
