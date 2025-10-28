@@ -53,7 +53,6 @@ const productSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-  isDeleted: { type: Boolean, default: false }
 });
 
 productSchema.index({ name: 1 }, { unique: true });
