@@ -2,6 +2,7 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const logAction = require("../utils/logAction");
+const dateFilter = require('../utils/dateFilter')
 
 exports.register = async (req, res) => {
   try {

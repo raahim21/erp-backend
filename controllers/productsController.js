@@ -3,6 +3,8 @@ const Category = require("../models/Category");
 const Brand = require("../models/Brand");
 const logAction = require("../utils/logAction");
 const mongoose = require("mongoose");
+const dateFilter = require('../utils/dateFilter')
+
 
 // Helper: basic validation
 function validateProductInput({ name, price, category, sku }) {

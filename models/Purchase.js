@@ -8,35 +8,33 @@
 //   },
 
 //   vendorId: {
-//   type: mongoose.Schema.Types.ObjectId,
-//   ref: "Vendor",
-//   required: function() {
-//     return this.type === "Vendor";
+//     type: mongoose.Schema.Types.ObjectId,
+//     ref: "Vendor",
+//     required: function() {
+//       return this.type === "Vendor";
+//     },
 //   },
-// },
 
 //   department: {
 //     type: String,
 //     required: function(){
-//     return this.type == 'Internal'
+//       return this.type === 'Internal';
 //     },
 //     trim: true,
 //   },
 
-// fromLocation: {
-//   type: mongoose.Schema.Types.ObjectId,
-//   ref: "Location",
-//   required: function() {
-//     return this.type === "Transfer";
+//   fromLocation: {
+//     type: mongoose.Schema.Types.ObjectId,
+//     ref: "Location",
+//     required: function() {
+//       return this.type === "Transfer";
+//     },
 //   },
-// },
-// toLocation: {
-//   type: mongoose.Schema.Types.ObjectId,
-//   ref: "Location",
-//   required: function() {
-//     return this.type === "Transfer";
+//   toLocation: {
+//     type: mongoose.Schema.Types.ObjectId,
+//     ref: "Location",
+//     required: true, // Made always required to match code logic (stock added to toLocation for all types)
 //   },
-// },
 
 //   productId: {
 //     type: mongoose.Schema.Types.ObjectId,
@@ -88,7 +86,6 @@
 
 
 
-// models/Purchase.js
 const mongoose = require("mongoose");
 
 const purchaseSchema = new mongoose.Schema({
@@ -136,6 +133,19 @@ const purchaseSchema = new mongoose.Schema({
     type: Number,
     required: true,
     min: 1,
+  },
+  unitPrice: {
+    type: Number,
+    min: 0,
+    default: 0,
+    required: function() {
+      return this.type !== "Transfer";
+    },
+  },
+  sellingUnitPrice: {
+    type: Number,
+    min: 0,
+    default: 0,
   },
   totalPrice: {
     type: Number,
