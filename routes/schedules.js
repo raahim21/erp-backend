@@ -8,7 +8,6 @@ const User = require("../models/User");
 const LeaveRequest = require("../models/LeaveRequest"); // Import LeaveRequest model
 const dateFilter = require("../utils/dateFilter");
 const { default: mongoose } = require("mongoose");
-const { GoogleGenAI, Type } = require("@google/genai");
 
 // Get all schedules
 router.get("/", auth, async (req, res) => {

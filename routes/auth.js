@@ -7,6 +7,10 @@ const requireRole = require("../middleware/roles");
 const router = express.Router();
 const dateFilter = require("../utils/dateFilter");
 
+// take the info and validate it
+// check if the user already exists
+// if not hash the password and save it
+
 // Register
 router.post(
   "/users",
@@ -41,6 +45,7 @@ router.post(
   }
 );
 
+
 router.delete(
   "/users/:id",
   auth,
@@ -60,6 +65,7 @@ router.delete(
     }
   }
 );
+
 
 router.get("/users-all", auth, async (req, res) => {
   try {
@@ -150,6 +156,18 @@ router.put("/users/:id", auth, requireRole("admin", "manager"), async (req, res)
 });
 
 // Login
+
+// verify the passoword and username
+// use the .sign method of jwt, the first argument is the payload, the second is the jwt secret, and the third is the expiry date
+// set the res.cookie, the first arrg is the name(set as token), the second is the actual token and third is the cookie settings
+
+// httpOnly Makes the cookie inaccessible to JavaScript in the browser (document.cookie).
+// Purpose: Prevents XSS attacks where malicious scripts try to steal cookies.
+
+// secure to true for security
+
+//sameSite Allows the cookie to be sent in cross-origin requests (like from your frontend domain to your backend domain). 
+
 router.post("/login", async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -171,10 +189,8 @@ router.post("/login", async (req, res) => {
     );
     res.cookie("token", token, {
       httpOnly: true,
-      // secure: process.env.NODE_ENV === "production",
-      // sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
        secure: true,               // ALWAYS true for SameSite=None
-  sameSite: "none",           // Required for cross-origin cookies
+        sameSite: "none",           // Required for cross-origin cookies
       maxAge: 24 * 60 * 60 * 1000 * 3,
     });
     await logAction(user._id, "Logged in");
@@ -208,20 +224,6 @@ router.get("/verify", async (req, res) => {
     res.status(401).json({ message: "Invalid token" });
   }
 });
-// router.get("/verify", async (req, res) => {
-//   try {
-//     const token = req.cookies.token;
-//     if (!token) return res.status(401).json({ message: "No token provided" });
-
-//     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-//     const user = await User.findById(decoded.id).select("_id role username");
-//     if (!user) return res.status(401).json({ message: "User not found" });
-
-//     res.json({ id: user._id, role: user.role, username: user.username });
-//   } catch (error) {
-//     res.status(401).json({ message: "Invalid token" });
-//   }
-// });
 
 
 // Logout
