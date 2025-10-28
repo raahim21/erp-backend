@@ -239,56 +239,20 @@
 // module.exports = router;
 
 
+
+
+
 const express = require("express");
 const auth = require("../middleware/auth");
 const requireRole = require("../middleware/roles");
-const productController = require("../controllers/productController");
+const productController = require("../controllers/products.controller");
 
 const router = express.Router();
 
-router.post("/", auth, requireRole("admin", "manager"), async (req, res) => {
-  try {
-    const product = await productController.createProduct(req.body, req.user.id);
-    res.status(201).json(product);
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-  }
-});
-
-router.get("/", auth, async (req, res) => {
-  try {
-    const data = await productController.getProducts(req.query);
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-router.get("/:id", auth, async (req, res) => {
-  try {
-    const product = await productController.getProductById(req.params.id);
-    res.json(product);
-  } catch (err) {
-    res.status(404).json({ message: err.message });
-  }
-});
-
-router.put("/:id", auth, requireRole("admin", "manager"), async (req, res) => {
-  try {
-    const product = await productController.updateProduct(req.params.id, req.body, req.user.id);
-    res.json(product);
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-  }
-});
-
-router.delete("/:id", auth, requireRole("admin", "manager"), async (req, res) => {
-  try {
-    const result = await productController.deleteProduct(req.params.id, req.user.id);
-    res.json(result);
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-  }
-});
+router.post("/", auth, requireRole("admin", "manager"), productController.createProduct);
+router.get("/", auth, productController.getProducts);
+router.get("/:id", auth, productController.getProductById);
+router.put("/:id", auth, requireRole("admin", "manager"), productController.updateProduct);
+router.delete("/:id", auth, requireRole("admin", "manager"), productController.deleteProduct);
 
 module.exports = router;
