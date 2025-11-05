@@ -3,14 +3,15 @@ const Category = require("../models/Category");
 const Brand = require("../models/Brand");
 const logAction = require("../utils/logAction");
 const mongoose = require("mongoose");
-const dateFilter = require('../utils/dateFilter')
+const dateFilter = require('../utils/dateFilter');
+const Purchase = require("../models/Purchase");
 
 
 // Helper: basic validation
-function validateProductInput({ name, price, category, sku }) {
+function validateProductInput({ name, sellingPrice, category, sku }) {
   if (!name || typeof name !== "string" || name.trim().length === 0) return "Product name is required.";
   if (!sku || typeof sku !== "string" || sku.trim().length === 0) return "SKU is required.";
-  if (price !== undefined && (isNaN(price) || price < 0)) return "Price must be a non-negative number.";
+  if (sellingPrice !== undefined && (isNaN(sellingPrice) || sellingPrice < 0)) return "selling price must be a non-negative number.";
   if (!category) return "Category is required.";
   return null;
 }
@@ -20,10 +21,10 @@ exports.createProduct = async (req, res) => {
   try {
     const {
       name, sku, unit, manufacturer, brand, weight, returnable, sellable,
-      purchasable, price, description, category, inventory = [],
+      purchasable, sellingPrice, description, category, inventory = [],
     } = req.body;
 
-    const validationError = validateProductInput({ name, price, category, sku });
+    const validationError = validateProductInput({ name, sellingPrice, category, sku });
     if (validationError) return res.status(400).json({ message: validationError });
 
     const catExists = await Category.findById(category);
@@ -35,15 +36,16 @@ exports.createProduct = async (req, res) => {
     }
 
     for (const inv of inventory) {
-      if (!inv.location || isNaN(inv.quantity) || inv.quantity < 0) {
+      if (!inv.location || isNaN(inv.quantity) || inv.quantity < 0) { 
         return res.status(400).json({ message: "Invalid inventory entry" });
       }
+      inv.quantity = 0
     }
 
     const product = new Product({
       name, sku, unit, manufacturer,
       brand: brand || null,
-      weight, returnable, sellable, purchasable, price,
+      weight, returnable, sellable, purchasable, sellingPrice,
       description, category, inventory, userId: req.user.id,
     });
 
