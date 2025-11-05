@@ -59,26 +59,39 @@ exports.createIssueOrder = async (req, res) => {
 
     const { clientName, clientPhone, customerId, products, totalAmount, issueDate } = req.body;
 
+    // Deduct stock first
     await deductStock(products, session);
+
+    // Map products to include current costPrice
+    const issueOrderProducts = await Promise.all(
+      products.map(async (item) => {
+        const product = await Product.findById(item.productId).session(session);
+        if (!product) throw new Error(`Product not found: ${item.productId}`);
+        return {
+          ...item,
+          costPrice: product.costPrice, // save cost at time of sale
+        };
+      })
+    );
 
     const issueOrder = new IssueOrder({
       clientName,
       clientPhone,
       customerId,
-      products,
+      products: issueOrderProducts,
       totalAmount,
       issueDate,
       userId: req.user.id,
     });
+
     await issueOrder.save({ session });
 
     await logAction(req.user.id, `Created issue order ${issueOrder._id}`);
     await session.commitTransaction();
     res.status(201).json(issueOrder);
+
   } catch (error) {
-    if (session) {
-      await session.abortTransaction();
-    }
+    if (session) await session.abortTransaction();
     console.error("Create issue order error:", error.message);
     res.status(400).json({ message: error.message });
   } finally {
@@ -167,15 +180,31 @@ exports.updateIssueOrder = async (req, res) => {
     // Revert previous stock changes
     await revertStock(issueOrder.products, session);
 
-    // Apply new stock changes
-    await deductStock(req.body.products, session);
+    const { clientName, clientPhone, customerId, products, totalAmount, issueDate } = req.body;
+
+    // If products are provided, map them to include current costPrice (like in create)
+    let updatedProducts = products;
+    if (products) {
+      updatedProducts = await Promise.all(
+        products.map(async (item) => {
+          const product = await Product.findById(item.productId).session(session);
+          if (!product) throw new Error(`Product not found: ${item.productId}`);
+          return {
+            ...item,
+            costPrice: product.costPrice, // Refresh to current cost at time of update
+          };
+        })
+      );
+    }
+
+    // Apply new stock changes (using updatedProducts if provided)
+    await deductStock(updatedProducts || issueOrder.products, session);
 
     // Update order details
-    const { clientName, clientPhone, customerId, products, totalAmount, issueDate } = req.body;
     if (clientName) issueOrder.clientName = clientName;
     if (clientPhone !== undefined) issueOrder.clientPhone = clientPhone;
     if (customerId) issueOrder.customerId = customerId;
-    if (products) issueOrder.products = products;
+    if (updatedProducts) issueOrder.products = updatedProducts;
     if (totalAmount) issueOrder.totalAmount = totalAmount;
     if (issueDate) issueOrder.issueDate = issueDate;
 

@@ -2,7 +2,6 @@
 const mongoose = require("mongoose");
 const Purchase = require("../models/Purchase");
 const Product = require("../models/Product");
-const StockMovement = require("../models/StockMovement");
 const Vendor = require("../models/Vendor");
 const Location = require("../models/Location");
 const User = require("../models/User");
@@ -63,9 +62,6 @@ exports.createPurchase = async (req, res) => {
       }
     }
     if (unitPrice*quantity!== totalPrice){
-            console.log(unitPrice)
-      console.log(quantity)
-      console.log(totalPrice)
       throw new Error('totalPrice is not the same as the calculated price')
     }
 
@@ -130,24 +126,6 @@ exports.createPurchase = async (req, res) => {
         } else {
           toInv.quantity += quantity;
         }
-
-        await new StockMovement({
-          productId,
-          changeType: "transfer",
-          quantityChange: -quantity,
-          referenceId: purchase._id,
-          userId: req.user.id,
-          note: `Transfer out from ${fromLocation}`,
-        }).save({ session });
-
-        await new StockMovement({
-          productId,
-          changeType: "transfer",
-          quantityChange: quantity,
-          referenceId: purchase._id,
-          userId: req.user.id,
-          note: `Transfer in to ${toLocation}`,
-        }).save({ session });
       } else {
         // === WEIGHTED AVERAGE COST PRICE ===
         const totalQtyBefore = product.inventory.reduce((s, i) => s + i.quantity, 0);
@@ -168,14 +146,7 @@ exports.createPurchase = async (req, res) => {
           toInv.quantity += quantity;
         }
 
-        await new StockMovement({
-          productId,
-          changeType: "purchase",
-          quantityChange: quantity,
-          referenceId: purchase._id,
-          userId: req.user.id,
-          note: `${type} purchase added to ${toLocation}`,
-        }).save({ session });
+        
       }
 
       product.inventory = product.inventory.filter(i => i.quantity > 0);
@@ -284,6 +255,7 @@ exports.getPurchaseById = async (req, res) => {
   }
 };
 
+
 exports.updatePurchase = async (req, res) => {
   let session;
   try {
@@ -354,11 +326,20 @@ exports.updatePurchase = async (req, res) => {
     };
 
     if (oldStatus === "Completed") {
+      if (oldType !== "Transfer") {
+        // Revert weighted average costPrice
+        const currentQty = oldProduct.inventory.reduce((s, i) => s + i.quantity, 0);
+        const revertAddedCost = purchase.unitPrice * oldQty; // Use old unitPrice and qty
+        const revertTotalCost = oldProduct.costPrice * currentQty - revertAddedCost;
+        const revertQty = currentQty - oldQty;
+        oldProduct.costPrice = revertQty > 0 ? revertTotalCost / revertQty : 0;
+      }
+      // Revert inventory
       if (oldType === "Transfer") {
-        adjustInventory(oldProduct, oldFromLoc, oldQty);
-        adjustInventory(oldProduct, oldToLoc, -oldQty);
+        adjustInventory(oldProduct, oldFromLoc, oldQty); // Add back to from
+        adjustInventory(oldProduct, oldToLoc, -oldQty); // Subtract from to
       } else {
-        adjustInventory(oldProduct, oldToLoc, -oldQty);
+        adjustInventory(oldProduct, oldToLoc, -oldQty); // Subtract from to
       }
     }
 
@@ -376,14 +357,7 @@ exports.updatePurchase = async (req, res) => {
           note: `Transfer out from ${newFromLoc}`,
         }).save({ session });
 
-        await new StockMovement({
-          productId: newProduct._id,
-          changeType: "transfer",
-          quantityChange: newQty,
-          referenceId: purchase._id,
-          userId: req.user.id,
-          note: `Transfer in to ${newToLoc}`,
-        }).save({ session });
+        
       } else {
         // === WEIGHTED AVERAGE COST PRICE ===
         const costUnit = unitPrice ?? purchase.unitPrice;
@@ -396,19 +370,12 @@ exports.updatePurchase = async (req, res) => {
           : costUnit;
 
         if (sellingUnitPrice ?? purchase.sellingUnitPrice > 0) {
-          newProduct.price = sellingUnitPrice ?? purchase.sellingUnitPrice;
+          newProduct.sellingPrice = sellingUnitPrice ?? purchase.sellingUnitPrice; // Fixed typo: was .price, but schema uses .sellingPrice
         }
 
         adjustInventory(newProduct, newToLoc, newQty);
 
-        await new StockMovement({
-          productId: newProduct._id,
-          changeType: "purchase",
-          quantityChange: newQty,
-          referenceId: purchase._id,
-          userId: req.user.id,
-          note: `${newType} purchase added to ${newToLoc}`,
-        }).save({ session });
+        
       }
     }
 
@@ -484,6 +451,16 @@ exports.deletePurchase = async (req, res) => {
       let fromInv = product.inventory.find(inv => inv.location.toString() === purchase.fromLocation?.toString());
       let toInv = product.inventory.find(inv => inv.location.toString() === purchase.toLocation.toString());
 
+      if (purchase.type !== "Transfer") {
+        // Revert weighted average costPrice
+        const currentQty = product.inventory.reduce((s, i) => s + i.quantity, 0);
+        const revertAddedCost = purchase.unitPrice * purchase.quantity;
+        const revertTotalCost = product.costPrice * currentQty - revertAddedCost;
+        const revertQty = currentQty - purchase.quantity;
+        product.costPrice = revertQty > 0 ? revertTotalCost / revertQty : 0;
+      }
+
+      // Revert inventory
       if (purchase.type === "Transfer") {
         if (!fromInv) throw new Error("From location inventory not found");
         fromInv.quantity += purchase.quantity;

@@ -15,8 +15,6 @@ const shiftRoutes = require("./routes/shift");
 const customerRoutes = require('./routes/customers')
 const categoryRoutes = require('./routes/categories')
 const locationRoutes = require('./routes/locations.js')
-const stockMovementRoutes = require('./routes/stockMovements.js')
-const stockAdjustmentRoutes = require('./routes/stockAdjustments.js')
 const notificationRoutes = require('./routes/notifications.js')
 const brandRoutes = require('./routes/brand.js')
 const dummy  = require('./routes/dummy.js')
@@ -50,9 +48,7 @@ app.use("/api/schedules", scheduleRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use('/api/customers', customerRoutes)
 app.use('/api/locations', locationRoutes)
-app.use('/api/stockMovements', stockMovementRoutes)
 app.use('/api/notifications', notificationRoutes)
-app.use('/api/stockAdjustments', stockAdjustmentRoutes)
 app.use('/api/brands', brandRoutes)
 app.use("/api/vendors", vendorRoutes);
 app.use("/api/leave", leaveRoutes);

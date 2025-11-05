@@ -29,6 +29,7 @@ const issueOrderSchema = new mongoose.Schema({
         required: true,
         min: 0,
       },
+       costPrice: { type: Number, required: true, min: 0 }, // NEW
     },
   ],
   issueDate: {
